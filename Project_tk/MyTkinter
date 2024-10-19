@@ -1,0 +1,171 @@
+import tkinter as tk
+from tkinter import simpledialog, messagebox
+import sqlite3
+#Función para crear:
+def crear_db():
+    conexion = sqlite3.connect("persona.db")
+    cursor = conexion.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS persona (
+                      Nombre TEXT NOT NULL,
+                      DNI TEXT PRIMARY KEY,
+                      Correo TEXT NOT NULL,
+                      Edad INTEGER NOT NULL )''')
+    conexion.commit()
+    return conexion, cursor
+# Función para llenar el Listbox con los nombres
+def llenar_listbox():
+    conexion, cursor = crear_db()
+    cursor.execute('SELECT Nombre FROM persona')
+    listbox.delete(0, tk.END)  # Limpiar el Listbox
+    for fila in cursor.fetchall():
+        listbox.insert(tk.END, fila[0])
+    conexion.close()
+# Función para mostrar detalles de la persona seleccionada
+def mostrar_detalles(event):
+    seleccion = listbox.curselection()
+    if seleccion:
+        indice = seleccion[0]
+        Nombre = listbox.get(indice)
+        conexion, cursor = crear_db()
+        cursor.execute('SELECT * FROM persona WHERE Nombre = ?', (Nombre,))
+        persona = cursor.fetchone()
+        conexion.close()
+        if persona:
+            Nombre_label.config(text=f"Nombre: {persona[0]}")
+            DNI_label.config(text=f"DNI: {persona[1]}")
+            Correo_label.config(text=f"Correo: {persona[2]}")
+            Edad_label.config(text=f"Edad: {persona[3]}")
+#Función para mostrar formulario:
+def mostrar_formulario(Acción, DNI=None):
+    form = tk.Toplevel(ventana)
+    form.title(f"{Acción} Persona")
+    form.geometry("300x300")
+    def Guardar():
+        Nombre = Nombre_entry.get()
+        DNI = DNI_entry.get()
+        Correo = Correo_entry.get()
+        try:
+            Edad = int(Edad_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Edad debe ser un número.")
+            return
+        conexion, cursor = crear_db()
+        if Acción == "Agregar":
+            if not Nombre or not DNI or not Correo or not Edad:
+                messagebox.showerror("Error", "Todos los campos son obligatorios.")
+                return
+            try:
+                cursor.execute('INSERT INTO persona (Nombre, DNI, Correo, Edad) VALUES (?, ?, ?, ?)', (Nombre, DNI, Correo, Edad))
+                conexion.commit()
+            except sqlite3.IntegrityError:
+                messagebox.showerror("Error", "DNI ya existe.")
+                return
+        elif Acción == "Modificar":
+            if not Nombre or not Correo or not Edad:
+                messagebox.showerror("Error", "Todos los campos son obligatorios.")
+                return
+            cursor.execute("UPDATE persona SET Nombre=?, Correo=?, Edad=? WHERE DNI=?", (Nombre, Correo, Edad, DNI))
+            conexion.commit()
+        conexion.close()
+        llenar_listbox()
+        form.destroy()
+        tk.Label(form, text="Nombre:").pack(pady=5)
+        Nombre_entry = tk.Entry(form)
+        Nombre_entry.pack(pady=5)
+        tk.Label(form, text="DNI:").pack(pady=5)
+        DNI_entry = tk.Entry(form)
+        DNI_entry.pack(pady=5)
+        tk.Label(form, text="Correo:").pack(pady=5)
+        Correo_entry = tk.Entry(form)
+        Correo_entry.pack(pady=5)
+        tk.Label(form, text="Edad:").pack(pady=5)
+        Edad_entry = tk.Entry(form)
+        Edad_entry.pack(pady=5)
+        if Acción == "Modificar" and DNI:
+            conexion, cursor = crear_db()
+        cursor.execute('SELECT * FROM persona WHERE DNI = ?', (DNI,))
+        persona = cursor.fetchone()
+        conexion.close()
+        if persona:
+            Nombre_entry.insert(0, persona[0])
+            DNI_entry.insert(0, persona[1])
+            Correo_entry.insert(0, persona[2])
+            Edad_entry.insert(0, persona[3])
+        tk.Button(form, text="Guardar", command=Guardar).pack(pady=10)
+def Agregar_persona():
+    mostrar_formulario("Agregar")
+def Editar_persona():
+    seleccion = listbox.curselection()
+    if seleccion:
+        indice = seleccion[0]
+        Nombre = listbox.get(indice)
+        conexion, cursor = crear_db()
+        cursor.execute("SELECT * FROM persona WHERE Nombre=?", (Nombre,))
+        persona = cursor.fetchone()
+        conexion.close()
+        if persona:
+            mostrar_formulario("Modificar", persona[1])
+def Eliminar_persona():
+    seleccion = listbox.curselection()
+    if not seleccion:
+        messagebox.showwarning("Eliminar Persona", "Por favor selecciona una persona.")
+        return
+    indice = seleccion[0]
+    nombre = listbox.get(indice)
+    confirmacion = messagebox.askyesno("Eliminar Persona", f"¿Estás seguro de eliminar a {nombre}?")
+    if confirmacion:
+        conexion, cursor = crear_db()
+        cursor.execute("DELETE FROM persona WHERE Nombre = ?", (nombre,))
+        conexion.commit()
+        conexion.close()
+        llenar_listbox()
+        Nombre_label.config(text="Nombre:")
+        DNI_label.config(text="DNI:")
+        Correo_label.config(text="Correo:")
+        Edad_label.config(text="Edad:")
+# Configuración de la ventana principal
+ventana = tk.Tk()
+ventana.title("Lista de Personas")
+ventana.geometry("600x400")
+etiqueta= tk.Label(ventana,
+                   text="Hola. ¡Bienvenido a 'Barra de desplazamiento', nuestro primer proyecto!")
+etiqueta.pack()
+# Configuración de icon del grupo:
+ventana.iconbitmap('Icono_Grupo12.ico')
+# Configuración del menú
+menu_bar = tk.Menu(ventana)
+ventana.config(menu=menu_bar)
+persona_menu = tk.Menu(menu_bar, tearoff=0)
+menu_bar.add_cascade(label="Persona", menu=persona_menu)
+persona_menu.add_command(label="Agregar", command=Agregar_persona)
+persona_menu.add_command(label="Modificar", command=Editar_persona)
+persona_menu.add_command(label="Eliminar", command=Eliminar_persona)
+# Creación del frame principal (debajo del menú)
+frame_principal = tk.Frame(ventana)
+frame_principal.pack(fill=tk.BOTH, expand=True, pady=20)
+# Frame para el Listbox y Scrollbar (lado izquierdo)
+frame_izquierdo = tk.Frame(frame_principal)
+frame_izquierdo.pack(side=tk.LEFT, fill=tk.Y, padx=10)
+scrollbar = tk.Scrollbar(frame_izquierdo, orient=tk.VERTICAL)
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+listbox = tk.Listbox(frame_izquierdo, yscrollcommand=scrollbar.set, bg="#f0f0f0", font=("Arial", 12))
+listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+scrollbar.config(command=listbox.yview)
+# Frame para los detalles (lado derecho)
+frame_derecho = tk.Frame(frame_principal, padx=10, pady=10)
+frame_derecho.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+# Etiquetas para mostrar los detalles de la persona
+Nombre_label = tk.Label(frame_derecho, text="Nombre: ", font=("Arial", 14, "bold"), fg="#2e2e2e")
+Nombre_label.pack(anchor="w", pady=5)
+DNI_label = tk.Label(frame_derecho, text="DNI: ", font=("Arial", 12), fg="#2e2e2e")
+DNI_label.pack(anchor="w", pady=5)
+Correo_label = tk.Label(frame_derecho, text="Correo: ", font=("Arial", 12), fg="#2e2e2e")
+Correo_label.pack(anchor="w", pady=5)
+Edad_label = tk.Label(frame_derecho, text="Edad: ", font=("Arial", 12), fg="#2e2e2e")
+Edad_label.pack(anchor="w", pady=5)
+# Llenar el Listbox con los nombres de las personas
+llenar_listbox()
+# Vincular la selección del Listbox con la función para mostrar detalles
+listbox.bind("<<ListboxSelect>>", mostrar_detalles)
+# Ejecutar la aplicación
+ventana.mainloop()
