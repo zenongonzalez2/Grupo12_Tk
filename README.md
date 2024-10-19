@@ -1,2 +1,2 @@
 # Grupo12_Tk
-Proyecto opcional de Tk 
+Proyecto opcional de Tkinter: Zenón González - Sebastián I. Pereyra
